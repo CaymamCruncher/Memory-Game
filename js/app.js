@@ -12,7 +12,11 @@ const victoryScreen = document.querySelector('.victory');
 const starNumber = document.querySelector('.stars');
 const restartButton = document.querySelectorAll('.fa-repeat');
 const resetStar = document.querySelectorAll('.stars>li');
-let timerStarted = false;
+const optionsButton = document.querySelector('.fa-cog');
+const sixteenTileButton = document.getElementById('16-tile');
+const twentyTileButton = document.getElementById('20-tile');
+const timedButton = document.getElementById('timed-button');
+const moveButton = document.getElementById('move-button');
 let timer = document.querySelector('.timer');
 let interval;
 let minutes = 0;
@@ -23,17 +27,26 @@ let moveCount = document.querySelector('.moves');
 let moveValue = 0;
 let starLoss = 15;
 let starScore = 3;
+let twentyTile = false;
+let timerStarted = false;
+let hardMode = false;
 
 // Uses the shuffle function to randomize card values
 randomizeCards();
 
 // On card click calls flipCard function
 cardDeck.addEventListener('click', flipCard);
-console.log(resetStar)
 
 // On restart button click calls shuffle
-restartButton[0].addEventListener('click', restartGame);
-restartButton[1].addEventListener('click', restartGame);
+restartButton[0].addEventListener('click', () => restartGame());
+restartButton[1].addEventListener('click', () => restartGame());
+
+// On option button click toggle the menu
+optionsButton.addEventListener('click', toggleOptions);
+sixteenTileButton.addEventListener('click', () => changeTiles(false));
+twentyTileButton.addEventListener('click', () => changeTiles(true));
+timedButton.addEventListener('click', () => restartGame(true));
+moveButton.addEventListener('click', startHardMode);
 
 
 /*
@@ -75,7 +88,11 @@ function checkNumCards() {
   if (numFlippedCards.length > 1) {
     cardDeck.removeEventListener('click', flipCard);
     moveValue += 1;
-    moveCount.textContent = moveValue;
+		if (hardMode) {
+			moveCount.textContent = 24-moveValue + ' Moves Remaining';
+		} else {
+			moveCount.textContent = moveValue + ' Moves';
+		}
     loseStar();
     let match = cardsMatch(numFlippedCards);
     // if cards match then sets them to matched and checks if game is won
@@ -85,7 +102,10 @@ function checkNumCards() {
       cardDeck.addEventListener('click', flipCard);
       if (gameWon()) {
         endGame();
-      }
+      } else if (hardMode && moveValue >= 24) {
+				alert('You ran out of moves!!!');
+				restartGame();
+			}
     // if cards don't match then it sets them to wrong and plays an animation
     } else {
       numFlippedCards[0].className += ' wrong';
@@ -95,6 +115,10 @@ function checkNumCards() {
         numFlippedCards[1].className = 'card';
         cardDeck.addEventListener('click', flipCard);
       },900);
+			if (hardMode && moveValue >= 24) {
+				alert('You ran out of moves!!!');
+				restartGame();
+			}
     }
   }
 }
@@ -112,7 +136,7 @@ function cardsMatch(cards) {
 // gameWon function checks to see if all the cards match
 
 function gameWon() {
-  for (card of cards) {
+  for (let card of cards) {
     if (!card.classList.contains('match')) {
       return false;
     }
@@ -134,7 +158,9 @@ function endGame() {
 
 function loseStar() {
   if (moveValue >= starLoss) {
-    if (starLoss > 25) {
+		if (twentyTile && starLoss > 30) {
+			return;
+		} else if (starLoss > 25 && !twentyTile) {
       return;
     }
     starNumber.removeChild(starNumber.firstElementChild);
@@ -145,18 +171,30 @@ function loseStar() {
 
 // restartGame resets moveCount and all the cards
 
-function restartGame() {
+function restartGame(timed = false) {
   let restartCards = document.querySelectorAll('.deck>li');
   for (let i = 0; i < starNumber.children.length; i++) {
     starNumber.append(resetStar[i]);
+
+    // apply margin to first 2 stars to correct spacing
+    i < 2 ? starNumber.children[i].style.margin = '0 3px 0 0' : null;
   }
 // loops through all the cards and makes sure they're all closed
   for (let p = 0; p < restartCards.length; p++) {
-    restartCards[p].className = 'card';
+		restartCards[p].className = 'card';
   }
   moveValue = 0;
-  moveCount.textContent = 0;
-  starLoss = 15;
+	if (hardMode) {
+		moveCount.textContent = '24 Moves Remaining';
+		timed = true;
+	} else {
+		moveCount.textContent = '0 Moves';
+	}
+	if (twentyTile) {
+		starLoss = 19;
+	} else {
+		starLoss = 15;
+	}
   starScore = 3;
   restarting = true;
   container.style.display = 'flex';
@@ -164,12 +202,15 @@ function restartGame() {
   cardDeck.addEventListener('click', flipCard);
   stopTimer();
   randomizeCards();
+	if (timed) {
+		startTimer(timed);
+	}
 }
 
 // randomizeCards calls shuffle function to randomize all the cards
 
 function randomizeCards() {
-  for (cardValue of cardValues) {
+  for (let cardValue of cardValues) {
     if (!restarting) {
       cardClass.push(cardValue.className);
     }
@@ -177,39 +218,94 @@ function randomizeCards() {
   }
   shuffle(cardClass);
   for (let i = 0; i < cardClass.length; i++) {
+		if (cardClass[i].includes('fa-money') || cardClass[i].includes('fa-car')) {
+			if (twentyTile) {
+				cardValues[i].parentElement.className = 'card';
+			} else {
+				cardValues[i].parentElement.className = 'card hidden match';
+			}
+		}
     cardValues[i].className = cardClass[i];
   }
 }
 
 // startTimer function starts once the user clicks a card.
 
-function startTimer() {
+function startTimer(timed = false) {
   timerStarted = true;
-  interval = setInterval(function () {
-    seconds += 1;
-    if (seconds === 60) {
-      minutes += 1;
-      seconds = 0;
-    }
-    if (seconds < 10) {
-      timer.textContent = minutes + ':0' + seconds;
-    } else {
-      timer.textContent = minutes + ':' + seconds;
-    }
-  },1000);
-
+	if (timed) {
+		timed = false;
+		minutes = 5;
+		seconds = 0;
+		interval = setInterval(function () {
+			if (seconds === 0) {
+				minutes -= 1;
+				seconds = 60;
+			}
+			seconds -= 1;
+			if (seconds < 10) {
+				timer.textContent = minutes + ':0' + seconds;
+			} else {
+				timer.textContent = minutes + ':' + seconds;
+			}
+			if (minutes === 0 && seconds === 0) {
+				alert('Out of time!!!');
+				restartGame();
+			}
+		},1000);
+	} else {
+		interval = setInterval(function () {
+			seconds += 1;
+			if (seconds === 60) {
+				minutes += 1;
+				seconds = 0;
+			}
+			if (seconds < 10) {
+				timer.textContent = minutes + ':0' + seconds;
+			} else {
+				timer.textContent = minutes + ':' + seconds;
+			}
+		},1000);
+	}
 }
 
 // stopTimer function stops the timer once the game ends
 
 function stopTimer() {
-  clearInterval(interval);
-  if (!gameWon()) {
-    seconds = 0;
-    minutes = 0;
-    timerStarted = false;
-    timer.textContent = '00:00';
-  }
+	clearInterval(interval);
+	if (!gameWon()) {
+		seconds = 0;
+		minutes = 0;
+		timerStarted = false;
+		timer.textContent = '00:00';
+	}
+}
+
+// toggleOptions function toggles option menu
+function toggleOptions() {
+	let menu = document.querySelector('.options-menu');
+	if (menu.style.display != "flex") {
+		menu.style.display = "flex"
+	} else {
+		menu.style.display = "none";
+	}
+}
+
+// change between 20 and 16 tiles
+function changeTiles(value) {
+	twentyTile = value;
+	restartGame();
+}
+
+// Hard mode turns on timed mode and a move counter
+function startHardMode() {
+	if (hardMode === true) {
+		hardMode = false;
+		restartGame();
+	} else {
+		hardMode = true;
+		restartGame(true);
+	}
 }
 
 /*
